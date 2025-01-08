@@ -4,7 +4,7 @@ use std::{
     fmt,
     fs::File,
     io::{sink, BufWriter, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddrV4},
+    net::{Ipv4Addr, SocketAddrV4},
     path::PathBuf,
 };
 
@@ -12,8 +12,8 @@ use anyhow::Context;
 use chrono::{DateTime, Local};
 use clap::{Args, Parser};
 use cli_table::{print_stdout, Table, WithTitle};
-use etherparse::{NetSlice, SlicedPacket, TransportSlice};
-use ipnetwork::IpNetwork;
+use etherparse::{err::ip::LaxHeaderSliceError, LaxNetSlice, LaxSlicedPacket, TransportSlice};
+use ipnetwork::{IpNetwork, Ipv4Network};
 use pcap::{Activated, Capture};
 use tracing::{info_span, warn};
 
@@ -111,18 +111,12 @@ fn main() -> anyhow::Result<()> {
             .open()?
             .into()
     } else {
+        const NET: IpNetwork =
+            IpNetwork::V4(Ipv4Network::new_checked(Ipv4Addr::new(192, 168, 139, 0), 24).unwrap());
+
         let dev = pcap::Device::list()?
             .into_iter()
-            .find(|d| {
-                d.addresses.iter().any(|addr| {
-                    const ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 139, 0));
-                    const MASK: IpAddr = IpAddr::V4(Ipv4Addr::new(255, 255, 255, 0));
-                    IpNetwork::with_netmask(ADDR, MASK)
-                        .unwrap()
-                        .contains(addr.addr)
-                        && addr.netmask.is_some_and(|mask| mask == MASK)
-                })
-            })
+            .find(|d| d.addresses.iter().any(|addr| NET.contains(addr.addr)))
             .context("Cannot find suitable network interface")?;
         warn!(
             "Automatically selected network interface: {}{}",
@@ -154,12 +148,19 @@ fn main() -> anyhow::Result<()> {
                     caplen = pkt.header.caplen,
                     len = pkt.header.len
                 ).entered();
-                let pkt = if is_ethernet {
-                    SlicedPacket::from_ethernet(pkt.data)?
+                let res = if is_ethernet {
+                    LaxSlicedPacket::from_ethernet(pkt.data).map_err(LaxHeaderSliceError::Len)
                 } else {
-                    SlicedPacket::from_ip(pkt.data)?
+                    LaxSlicedPacket::from_ip(pkt.data)
                 };
-                let Some(NetSlice::Ipv4(ipv4)) = pkt.net else {
+                let pkt = match res {
+                    Ok(pkt) => pkt,
+                    Err(e) => {
+                        warn!("Failed to parse packet: {}", e);
+                        continue;
+                    }
+                };
+                let Some(LaxNetSlice::Ipv4(ipv4)) = pkt.net else {
                     continue;
                 };
                 if let Some(TransportSlice::Udp(udp)) = pkt.transport {
@@ -173,12 +174,12 @@ fn main() -> anyhow::Result<()> {
                     )
                     .entered();
                     if let Err(e) = proto::dump(udp.payload(), &mut out) {
-                        warn!("Failed to dump packet: {:?}", e);
+                        warn!("Failed to dump packet: {}", e);
                     }
                 }
             }
             Err(e) => {
-                warn!("Failed to read packet: {:?}", e);
+                warn!("Failed to read packet: {}", e);
             }
         }
     }
