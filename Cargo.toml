@@ -1,0 +1,30 @@
+[package]
+name = "chuni-c2c-dumper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aes = "0.8.4"
+anyhow = { version = "1.0.95", features = ["backtrace"] }
+byteorder = "1.5.0"
+chrono = "0.4.39"
+cipher = "0.4.4"
+clap = { version = "4.5.23", features = ["derive"] }
+cli-table = { version = "0.4.9", default-features = false, features = [
+    "derive",
+] }
+enable-ansi-support = "0.2.1"
+etherparse = "0.16.0"
+faster-hex = { version = "0.10.0", default-features = false, features = [
+    "std",
+] }
+ipnetwork = "0.21.1"
+num_enum = "0.7.3"
+pcap = "2.2.0"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "s"
