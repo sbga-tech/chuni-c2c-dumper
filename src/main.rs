@@ -179,6 +179,9 @@ fn main() -> anyhow::Result<()> {
                 }
             }
             Err(e) => {
+                if matches!(e, pcap::Error::NoMorePackets) {
+                    break Ok(());
+                }
                 warn!("Failed to read packet: {}", e);
             }
         }
