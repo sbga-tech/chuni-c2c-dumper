@@ -132,6 +132,8 @@ struct Recruit {
     skill: u32,
     skill_level: u32,
     trophy: u32,
+    trophy2: u32,
+    trophy3: u32,
     rating: u32,
     music_id: u32,
     difficulty: u32,
@@ -166,6 +168,8 @@ impl Parse for Recruit {
         let skill = reader.read_u32::<LE>()?;
         let skill_level = reader.read_u32::<LE>()?;
         let trophy = reader.read_u32::<LE>()?;
+        let trophy2 = reader.read_u32::<LE>()?;
+        let trophy3 = reader.read_u32::<LE>()?;
         let rating = reader.read_u32::<LE>()?;
         let music_id = reader.read_u32::<LE>()?;
         let difficulty = reader.read_u32::<LE>()?;
@@ -204,6 +208,8 @@ impl Parse for Recruit {
             skill,
             skill_level,
             trophy,
+            trophy2,
+            trophy3,
             rating,
             music_id,
             difficulty,
